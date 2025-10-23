@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Timetable</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght{400;500;600;700}&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            max-width: 100vw;
+            overflow-x: auto;
+        }
+        canvas {
+            display: block;
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        /* Custom button styling */
+        .action-button {
+            background-color: #2563eb;
+            color: #ffffff;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+            text-align: center;
+        }
+        .action-button:hover {
+            background-color: #1e40af;
+        }
+        .download-button {
+            background-color: #4b5563; /* Grayed out by default */
+            color: #ffffff;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+            text-align: center;
+        }
+        .download-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .download-button:not(:disabled):hover {
+            background-color: #1e40af;
+        }
+        .download-attendance-button {
+            background-color: #10b981;
+        }
+        .download-attendance-button:not(:disabled):hover {
+            background-color: #059669;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-8">
+
+    <div class="flex flex-col items-center p-4 bg-white rounded-xl shadow-lg mb-8">
+        <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">Student Timetable Lookup</h1>
+        <p class="text-gray-600 mb-6 text-center">Enter your Student ID to view your specific course timetable.</p>
+        
+        <div class="w-full max-w-2xl flex flex-col items-center space-y-4">
+            <!-- ID Input Row -->
+            <div class="w-full">
+                <label for="student-id-input" class="block text-gray-700 text-sm font-bold mb-2">Student ID:</label>
+                <input type="text" id="student-id-input" placeholder="e.g., 20368757" class="shadow appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:shadow-outline transition duration-200">
+            </div>
+            
+            <button id="lookup-btn" class="action-button shadow-lg w-full">
+                Show Timetable
+            </button>
+            
+            <p id="message-display" class="text-red-600 font-medium hidden text-center w-full mt-2" role="alert"></p>
+            
+            <!-- Button Row -->
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 w-full pt-4">
+                <button id="download-btn" class="download-button w-full sm:w-1/2" disabled>
+                    Download Timetable PDF
+                </button>
+                <!--<button id="download-attendance-btn" class="download-button download-attendance-button w-full sm:w-1/2" disabled>
+                    Download Attendance Card
+                </button>-->
+            </div>
+        </div>
+    </div>
+
+    <div id="timetable-display" class="hidden">
+        <h2 id="course-title" class="text-2xl font-semibold text-gray-700 mb-4 mt-8"></h2>
+        <div class="bg-white p-4 sm:p-6 rounded-xl shadow-lg">
+            <div id="timetable-container" class="container">
+                <canvas id="timetable-canvas" width="1000" height="600"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- jsPDF library for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const studentIdInput = document.getElementById('student-id-input');
+            const lookupBtn = document.getElementById('lookup-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const downloadAttendanceBtn = document.getElementById('download-attendance-btn');
+            const timetableDisplay = document.getElementById('timetable-display');
+            const courseTitleElement = document.getElementById('course-title');
+            const messageDisplay = document.getElementById('message-display');
+            const canvas = document.getElementById('timetable-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            let timetableData = [];
+            let idToCourseMap = {};
+            let currentCourse = null;
+
+            // Drawing constants for Canvas
+            const timeHeaderWidth = 80;
+            const dayHeaderHeight = 40;
+            const timeSlots = [
+                '9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'
+            ];
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+            const minutesInSlot = 30;
+
+            // Helper function: parse time string like "9:00" and return minutes from midnight
+            function parseTime(timeStr) {
+                const [hours, minutes] = timeStr.split(':').map(Number);
+                return hours * 60 + minutes;
+            }
+
+            // Helper function: convert 12-hour time string to 24-hour time string
+            function convert12hrTo24hr(timeStr) {
+                let [hours, minutes] = timeStr.split(':').map(Number);
+                // Adjust for PM times (assuming times like 1:00 to 8:00 are PM)
+                if (hours >= 1 && hours <= 8) {
+                    hours += 12;
+                }
+                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            }
+
+            // --- DATA PROCESSING FUNCTIONS ---
+
+            // Function to process the main timetable CSV content
+            function processTimetableCSV(csvString) {
+                const rows = csvString.trim().split('\n').map(row => row.split(',').map(cell => cell.replace(/"/g, '')));
+                const headers = rows[0];
+                timetableData = rows.slice(1).map(row => {
+                    const event = {};
+                    headers.forEach((header, index) => {
+                        event[header.trim()] = row[index] ? row[index].trim() : '';
+                    });
+                    event.length = parseFloat(event.length);
+                    return event;
+                });
+            }
+
+            // Function to process the Student ID to Course Map CSV content (FIXED)
+            function processIdMapCSV(csvString) {
+                const map = {};
+                // Split by newline (handling both \r\n and \n)
+                const rows = csvString.trim().split(/\r?\n/).filter(line => line.trim() !== '');
+
+                // Skip the header row
+                const dataRows = rows.slice(1);
+                
+                dataRows.forEach(rowString => {
+                    // Split the row by comma. This is simple and reliable for getting the first and last column,
+                    // even if quoted fields with internal commas break the middle columns.
+                    const cells = rowString.split(','); 
+                    
+                    if (cells.length > 1) {
+                        // Extract the first cell (ID) and the last cell (Course)
+                        // Then clean them of quotes and excess whitespace.
+                        const studentId = cells[0].replace(/"/g, '').trim();
+                        const courseId = cells[cells.length - 1].replace(/"/g, '').trim();
+
+                        if (studentId && courseId) {
+                            map[studentId] = courseId;
+                        }
+                    }
+                });
+                return map;
+            }
+            
+            // --- CANVAS DRAWING FUNCTION ---
+            function drawTimetable(course) {
+                currentCourse = course; // Store the current course
+                messageDisplay.classList.add('hidden');
+                
+                // Clear the canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Calculate cell dimensions dynamically
+                const timeCellWidth = (canvas.width - timeHeaderWidth) / (timeSlots.length * 2);
+                const dayCellHeight = (canvas.height - dayHeaderHeight) / days.length;
+
+                // Draw headers
+                ctx.fillStyle = '#1f2937';
+                ctx.font = '600 14px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Draw time headers
+                timeSlots.forEach((slot, index) => {
+                    ctx.save();
+                    ctx.translate(timeHeaderWidth + index * timeCellWidth * 2 + timeCellWidth, dayHeaderHeight / 2);
+                    ctx.fillStyle = '#1f2937';
+                    ctx.fillText(slot, 0, 0);
+                    ctx.restore();
+                });
+                
+                // Draw day labels
+                ctx.fillStyle = '#4b5563';
+                ctx.font = '600 14px Inter, sans-serif';
+                ctx.textAlign = 'left';
+                days.forEach((day, index) => {
+                    ctx.save();
+                    ctx.translate(10, dayHeaderHeight + index * dayCellHeight + dayCellHeight / 2);
+                    ctx.fillStyle = '#4b5563';
+                    ctx.fillText(day, 0, 0);
+                    ctx.restore();
+                });
+
+                // Draw grid lines (horizontal and vertical)
+                ctx.strokeStyle = '#e5e7eb';
+                
+                // Horizontal lines
+                for (let i = 0; i <= days.length; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(timeHeaderWidth, dayHeaderHeight + i * dayCellHeight);
+                    ctx.lineTo(canvas.width, dayHeaderHeight + i * dayCellHeight);
+                    ctx.stroke();
+                }
+
+                // Vertical lines (at the beginning of each hour)
+                for (let i = 0; i < timeSlots.length; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(timeHeaderWidth + i * timeCellWidth * 2, dayHeaderHeight);
+                    ctx.lineTo(timeHeaderWidth + i * timeCellWidth * 2, canvas.height);
+                    ctx.stroke();
+                }
+
+                // Draw events
+                const courseEvents = timetableData.filter(event => event.course === course);
+                courseEvents.forEach(event => {
+                    const timeParts = event.time.split(' - ');
+                    const startTime24hr = convert12hrTo24hr(timeParts[0]);
+                    const endTime24hr = convert12hrTo24hr(timeParts[1]);
+                    const formattedTime = `${startTime24hr} - ${endTime24hr}`;
+
+                    const startTimeMinutes = parseTime(startTime24hr);
+                    const dayIndex = parseInt(event.day) - 1;
+
+                    if (dayIndex >= 0 && dayIndex < days.length) {
+                        const startMinutesFrom9am = startTimeMinutes - parseTime('9:00');
+                        const startSlotIndex = startMinutesFrom9am / minutesInSlot;
+                        const durationInMinutes = event.length * 60;
+                        const durationInSlots = durationInMinutes / minutesInSlot;
+
+                        const x = timeHeaderWidth + startSlotIndex * timeCellWidth;
+                        const y = dayHeaderHeight + dayIndex * dayCellHeight;
+                        const width = durationInSlots * timeCellWidth;
+                        const height = dayCellHeight;
+
+                        // Draw event rectangle
+                        ctx.fillStyle = '#1e40af'; // Darker blue fill
+                        ctx.strokeStyle = '#2563eb';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.roundRect(x + 2, y + 2, width - 4, height - 4, 8);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        // Draw event text
+                        ctx.fillStyle = '#ffffff';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'top';
+                        
+                        const textX = x + 10;
+                        const textY = y + 8;
+                        const lineHeight = 16;
+
+                        // Main unit/course name
+                        ctx.font = '600 14px Inter, sans-serif';
+                        ctx.fillText(event.unit, textX, textY);
+                        
+                        // Time, lecturer, and room
+                        ctx.font = '500 11px Inter, sans-serif';
+                        ctx.fillText(formattedTime, textX, textY + lineHeight + 2);
+                        ctx.fillText(`Lecturer: ${event.lecturer}`, textX, textY + lineHeight * 2 + 2);
+                        ctx.fillText(`Room: ${event.room}`, textX, textY + lineHeight * 3 + 2);
+                    }
+                });
+                
+                courseTitleElement.textContent = `Timetable for Course: ${course}`;
+                timetableDisplay.classList.remove('hidden');
+                downloadBtn.disabled = false;
+                //downloadAttendanceBtn.disabled = false;
+            }
+
+            // --- PDF DRAWING HELPER FUNCTION (Draws one visual timetable card) ---
+            function drawAttendanceTimetable(doc, course, yOffset) {
+                const margin = 10;
+                const docWidth = doc.internal.pageSize.getWidth();
+                const cardWidth = docWidth - 2 * margin; // 190mm for A4 portrait
+                const cardHeight = 100; // Height for one card
+
+                let currentY = yOffset;
+
+                // 1. ID, Name, Date Header
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(50, 50, 50);
+
+                const headerLineHeight = 6;
+                doc.setFont(undefined, 'bold');
+                doc.text(`Course ID: ${course}`, margin, currentY);
+                doc.setFont(undefined, 'normal');
+                currentY += headerLineHeight;
+                doc.text(`ID: ______________________`, margin, currentY);
+                doc.text(`Student Name: ______________`, docWidth / 2, currentY);
+                currentY += headerLineHeight;
+                doc.text(`Date: ____________________`, margin, currentY);
+                currentY += headerLineHeight - 1; // Slight space reduction before grid starts
+
+                const gridYStart = currentY;
+                const dayHeaderHeight = 8; // Reduced height for time heading
+                const timeSlots = ['9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
+                const timeHeaderWidth = 20;
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                const dayCellHeight = (cardHeight - dayHeaderHeight) / days.length; 
+                const timeCellWidth = (cardWidth - timeHeaderWidth) / (timeSlots.length * 2);
+
+                // 2. Draw Grid and Headers
+                
+                // Draw outline box
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.5);
+                doc.rect(margin, gridYStart, cardWidth, cardHeight);
+
+                // Draw day labels (vertical header)
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'bold');
+                doc.text('Day', margin + timeHeaderWidth / 2, gridYStart + dayHeaderHeight / 2, { align: 'center' });
+                doc.setLineWidth(0.2); // Thinner line for grid
+                
+                // Horizontal lines (for days)
+                days.forEach((day, index) => {
+                    const y = gridYStart + dayHeaderHeight + index * dayCellHeight;
+                    // Draw day name
+                    doc.setFontSize(8);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(day.substring(0, 3), margin + timeHeaderWidth / 2, y + dayCellHeight / 2, { align: 'center' });
+                    // Draw day divider line
+                    doc.line(margin, y, margin + cardWidth, y); 
+                });
+                
+                // Vertical line for day header
+                doc.line(margin + timeHeaderWidth, gridYStart, margin + timeHeaderWidth, gridYStart + cardHeight);
+
+                // Draw time headers (horizontal top header)
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'bold');
+                timeSlots.forEach((slot, index) => {
+                    const x = margin + timeHeaderWidth + index * timeCellWidth * 2 + timeCellWidth;
+                    doc.text(slot, x, gridYStart + dayHeaderHeight / 2, { align: 'center' });
+                    
+                    // Vertical lines (at the beginning of each hour)
+                    const xHourLine = margin + timeHeaderWidth + index * timeCellWidth * 2;
+                    doc.line(xHourLine, gridYStart, xHourLine, gridYStart + cardHeight);
+                    
+                    // Vertical lines for half-hour slots
+                    const xHalfHourLine = xHourLine + timeCellWidth;
+                    if (index < timeSlots.length - 1) { 
+                         doc.setLineDash([1, 1], 0); // Dashed line for half hour
+                         doc.line(xHalfHourLine, gridYStart + dayHeaderHeight, xHalfHourLine, gridYStart + cardHeight);
+                         doc.setLineDash(0, 0); // Solid line reset
+                    }
+                });
+                
+                // Horizontal line for time header base
+                doc.line(margin, gridYStart + dayHeaderHeight, margin + cardWidth, gridYStart + dayHeaderHeight);
+
+
+                // 3. Draw Events (Unit Name only, top-left alignment)
+                const minutesInSlot = 30;
+                const courseEvents = timetableData
+                    .filter(event => event.course === course);
+
+                courseEvents.forEach(event => {
+                    const timeParts = event.time.split(' - ');
+                    const startTime24hr = convert12hrTo24hr(timeParts[0]);
+
+                    const startTimeMinutes = parseTime(startTime24hr);
+                    const dayIndex = parseInt(event.day) - 1;
+
+                    if (dayIndex >= 0 && dayIndex < days.length) {
+                        const startMinutesFrom9am = startTimeMinutes - parseTime('9:00');
+                        const startSlotIndex = startMinutesFrom9am / minutesInSlot;
+                        const durationInMinutes = event.length * 60;
+                        const durationInSlots = durationInMinutes / minutesInSlot;
+
+                        const x = margin + timeHeaderWidth + startSlotIndex * timeCellWidth;
+                        const y = gridYStart + dayHeaderHeight + dayIndex * dayCellHeight;
+                        const width = durationInSlots * timeCellWidth;
+                        const height = dayCellHeight;
+
+                        // Draw event box outline and WHITE fill (R:255, G:255, B:255)
+                        doc.setDrawColor(30, 30, 30);
+                        doc.setFillColor(255, 255, 255); // White fill requested
+                        doc.setLineWidth(0.4);
+                        doc.rect(x + 0.5, y + 0.5, width - 1, height - 1, 'FD');
+
+                        // Unit Text (Top-Left aligned)
+                        doc.setTextColor(30, 30, 30);
+                        doc.setFont(undefined, 'bold');
+                        doc.setFontSize(7);
+                        
+                        const textMarginX = 1; // Small horizontal padding
+                        const textMarginY = 2.5; // Small vertical padding from the top edge of the cell
+                        
+                        doc.text(event.unit, x + textMarginX, y + textMarginY, { align: 'left', baseline: 'top' });
+                    }
+                });
+            }
+
+            // Function to generate the Visual Attendance Card PDF (Two per page)
+            function generateAttendanceCardPDF(course) {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4'); // Portrait mode
+
+                // Draw the first timetable (top half) - starting at 10mm
+                drawAttendanceTimetable(doc, course, 10);
+
+                // Draw the second timetable (bottom half) - starting at 130mm
+                drawAttendanceTimetable(doc, course, 130); 
+                
+                doc.save(`attendance-card-visual-${course}.pdf`);
+            }
+
+            // --- MAIN LOGIC ---
+
+            // CSV Content for Student ID to Course Group mapping (Groups for TT yr1.csv)
+            const idMapCSVContent = `id,name,Group ,course
+20368757,"Afzal, Miss Sabah ",S118ED-Y1-G1
+20378618,"Khan, Miss Zulaykha Noor",S118ED-Y1-G1
+20377797,"Muhammad, Mr Talha Khan",S118ED-Y1-G1
+20381185,"Nawaz, Mr Qasim Qasim",S118ED-Y1-G1
+20380736,"Razaq, Mr Muneeb Ashfaq",S118ED-Y1-G1
+20378471,"Saju, Mr Simon ",S118ED-Y1-G1
+20379858,"Solkar, Mr Yousuf Ibrahim",S118ED-Y1-G1
+20385511,"Willis, Mr Wade King",S118ED-Y1-G1
+20380791,"Dar, Mr Aaryan Aaryan",S118ED-Y1-G1
+20379159,"Farag, Mr Ahmed Abdelrahman",S118ED-Y1-G1
+20374891,"Hickson, Mx Aidan ",S118ED-Y1-G1
+20380117,"Hussain, Mr Mohammed-Murtaza ",S118ED-Y1-G1
+20379909,"Ali Kanwal, Miss Sheeza ",S118ED-Y1-G1
+20381824,"Adams, Miss Charlotte Elizabeth",S118ED-Y1-G1
+20378862,"Munshi, Fayaz",S118ED-Y1-G1
+20379560,"Kouser, Mr Ali Mehmood",S118ED-Y1-G1
+20364571,"Khansia, Mr Layth Ahmed",S118ED-Y1-G1
+20379937,"Akhtar, Mr Aayan Kaser",S118ED-Y1-G1
+20360670,"Iqbal, Miss Shabana Kiran",S118ED-Y1-G2
+20379362,"Choudhry, Waniya ",S118ED-Y1-G2
+20368611,"Aslam, Mr Zidhaan ",S118ED-Y1-G2
+20381228,"Butt, Mr Sami ",S118ED-Y1-G2
+20378014,"Ghisa, Miss Aiman ",S118ED-Y1-G2
+20359335,"Hesketh, Miss Leona Nicole",S118ED-Y1-G2
+20377761,"Ibrahim, Mr Zain ",S118ED-Y1-G2
+20381477,"John, Miss Wisdom Amarachukwu",S118ED-Y1-G2
+20382471,"Oluwasegun, Miss Divine ",S118ED-Y1-G2
+20379157,"Patel, Miss Humayra ",S118ED-Y1-G2
+20384638,"Patel, Mr Hamza ",S118ED-Y1-G2
+20380340,"Shaheen, Miss Tayba ",S118ED-Y1-G2
+20379456,"Tai, Mr Uzair ",S118ED-Y1-G2
+20378753,Aiysha Kousar,S118ED-Y1-G2
+20378464,Bibi,S118ED-Y1-G2
+20378430,Bibi,S118ED-Y1-G2
+20380322,"Adam, Mr Humzah ",S118ED-Y1-G3
+20379316,"Al-Doseri, Miss Saja Al'issa",S118ED-Y1-G3
+20370815,"Alli, Miss Husnaa Sajid",S118ED-Y1-G3
+20379395,"Hassan, Miss Safah ",S118ED-Y1-G3
+20386204,"Iftikhar, Mr Ahsan ",S118ED-Y1-G3
+20360019,"Ilunga, Mr Daniel Kabanga",S118ED-Y1-G3
+20380864,"Ilyas, Miss Humairah ",S118ED-Y1-G3
+20378778,"Khan, Miss Maryam ",S118ED-Y1-G3
+20381032,"Malik, Miss Imaan Jan",S118ED-Y1-G3
+20385563,"Malik, Mr Faizaan ",S118ED-Y1-G3
+20378501,"Mohammed, Miss Maariah ",S118ED-Y1-G3
+20379445,"Shah, Miss Fiza Haroon",S118ED-Y1-G3
+20381125,"Vachhiyat, Mr Muhammad ",S118ED-Y1-G3
+20384188,"Hussain, Fatima",S118ED-Y1-G3
+20385488,"Hussain, Maryam",S118ED-Y1-G3
+20371539,"Hussain, Ms Sana ",S118ED-Y1-G3
+20378656,"Iqbal, Miss Sara ",S118ED-Y1-G3
+20374614,"Rahman, Mr Shaafi ",S118ED-Y1-G3
+20378911,"Begum, Miss Meena ",S118ED-Y1-G4
+20378686,"Jamil, Miss Alishba ",S118ED-Y1-G4
+20368896,"Adam, Miss Munira ",S118ED-Y1-G4
+20380214,"Ahmed, Miss Anam Kausar",S118ED-Y1-G4
+20369179,"Alsaedi, Miss Teeba Mohammad",S118ED-Y1-G4
+20366523,"Bhatti, Miss Halimah Kibriyah",S118ED-Y1-G4
+20385556,"Chaudhry, Miss Zara ",S118ED-Y1-G4
+20377644,"Fulat, Miss Tayyabah ",S118ED-Y1-G4
+20369369,"Iqbal, Miss Nayab ",S118ED-Y1-G4
+20369331,"Moazam, Miss Hifsa ",S118ED-Y1-G4
+20381551,"Nguyen, Miss Maryam ",S118ED-Y1-G4
+20378173,"Riaz, Miss Laiba Afzal",S118ED-Y1-G4
+20380266,"Saddat, Miss Perka ",S118ED-Y1-G4
+20378705,"Yousaf, Mr Muhammad Abdullah",S118ED-Y1-G4
+20357562,Khan,S118ED-Y1-G4
+20379896,"Sardar, Mr Issa ",S118ED-Y1-G4
+20380681,"Khan, Mr Mohammed Sultan",S118ED-Y1-G4
+20385637,"Ahmed, Mr Hamza ",S118ED-Y1-G4
+20384550,"Chaudhry, Mr Owais Owais Shahzad",S118ED-Y1-G5
+20381707,"Hamza, Mr Ali ",S118ED-Y1-G5
+20381018,"Akhtar, Mr Ali-Raza ",S118ED-Y1-G5
+20380744,"Ali, Miss Haleema ",S118ED-Y1-G5
+20380154,"Balesaria, Mr Sahl ",S118ED-Y1-G5
+20372340,"Freeman, Miss Sophie Riayah",S118ED-Y1-G5
+20370037,"Imtiaz, Miss Rubab ",S118ED-Y1-G5
+20378499,"Lambat, Miss Aamina Hassan",S118ED-Y1-G5
+20379819,"Malagocki, Mr Igor ",S118ED-Y1-G5
+20377975,"Malik, Miss Safira ",S118ED-Y1-G5
+20376017,"Ravat, Mr Sufyaan ",S118ED-Y1-G5
+20385481,"Rizwan, Miss Aneesa ",S118ED-Y1-G5
+20382978,"Sheikh, Miss Hajira ",S118ED-Y1-G5
+20370790,"Shoby, Miss Helen Angel ",S118ED-Y1-G5
+20380391,"Singh, Mr Jay Jay",S118ED-Y1-G5
+20378491,"Syed, Miss Javeriya Fatima",S118ED-Y1-G5
+20380684,"West-Qasam, Miss Hanna Bridget",S118ED-Y1-G5
+20379059,"Patel, Mr Ayaan ",S118ED-Y1-G6
+20381782,"Rehman, Mr Qasim ",S118ED-Y1-G6
+20378360,"Ahmed, Miss Aqsa ",S118ED-Y1-G6
+20381544,"Alennezi, Miss Fatima ",S118ED-Y1-G6
+20359110,"Azram, Miss Komal ",S118ED-Y1-G6
+20369772,"Badat, Mr Muhammad ",S118ED-Y1-G6
+20368395,"Begum, Miss Mariya ",S118ED-Y1-G6
+20385443,"Beha, Mr Abdel Rahman ",S118ED-Y1-G6
+20382278,"Billington, Mr Liam Jean",S118ED-Y1-G6
+20384712,"Iqbal, Mr Hamza Muhammad",S118ED-Y1-G6
+20365988,"Patel, Miss Raeesah Juned",S118ED-Y1-G6
+20385329,"Smith, Miss Hayden ",S118ED-Y1-G6
+20370847,"Suleman, Mr Mohammed Bilal",S118ED-Y1-G6
+20378500,"Ugradar, Miss Fatima ",S118ED-Y1-G6
+20378607,"Yasif, Miss Ameera ",S118ED-Y1-G6
+20378447,"Majeed, Miss Juwariyah ",S118ED-Y1-G6
+20347528,"Patel, Mr Mohammed Zain ",S118ED-Y1-G6
+20369989,"Bhatti, Mr Mubarak Asad Ali",S118ED-Y1-G6
+`;
+            idToCourseMap = processIdMapCSV(idMapCSVContent);
+
+            // CSV Content for the Timetable Data
+            const timetableCSVContent = `"course","unit","day","time","length","lecturer","room"
+"S104-G1","U4","2","9:00 - 10:30","1.5","Batoul","SP215"
+"S104-G1","TUT","2","11:00 - 12:00","1","Batoul","SP109"
+"S104-G1","U19","2","1:00 - 2:30","1.5","Batoul","SP312"
+"S104-G1","U12","4","1:15 - 2:45","1.5","Batoul","SP311"
+"S104-G1","English","3","9:00 - 10:30","1.5","None","TBA"
+"S104-G1","Maths","3","10:45 - 12:15","1.5","None","TBA"
+"S104-G1","U1","3","1:15 - 2:45","1.5","Batoul","SP312"
+"S104-G1","English","4","9:00 - 10:30","1.5","None","TBA"
+"S104-G1","Maths","4","10:45 - 12:15","1.5","None","TBA"
+"S104-G1","U3","5","1:15 - 2:45","1.5","Sam","SP215"
+"S104-G1","TUT","5","10:00 - 11:00","1","Sam","SP109"
+"S118ED-Y1-G1","U2/4","1","9:00 - 10:30","1.5","Dalia","SP307"
+"S118ED-Y1-G1","U3B/10","1","11:00 - 12:30","1.5","Mubasshira","SP308"
+"S118ED-Y1-G1","U3P/4","1","1:45 - 3:15","1.5","Sam","SP310"
+"S118ED-Y1-G1","U1B/9","3","10:00 - 11:00","1","Sadik","SP312"
+"S118ED-Y1-G1","U2/4","2","9:00 - 10:00","1","Amran","SP311"
+"S118ED-Y1-G1","U1P/4","2","2:15 - 3:15","1","Saimah","SP309"
+"S118ED-Y1-G1","U1C/14","2","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G1","U1P/4","3","11:15 - 12:15","1","Saimah","SP312"
+"S118ED-Y1-G1","U2/4","3","1:00 - 2:00","1","Amran","SP310"
+"S118ED-Y1-G1","U1B/9","2","2:45 - 3:45","1","Sadik","SP312"
+"S118ED-Y1-G1","U1C/14","4","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G1","U2C/3","5","10:00 - 11:00","1","Mubasshira","SP308"
+"S118ED-Y1-G1","U2P/4","5","11:00 - 12:00","1","Batoul","SP307"
+"S118ED-Y1-G5","U2/4","1","9:00 - 10:30","1.5","Dalia","SP307"
+"S118ED-Y1-G5","U3B/10","1","11:00 - 12:30","1.5","Mubasshira","SP308"
+"S118ED-Y1-G5","U3P/4","1","1:45 - 3:15","1.5","Sam","SP310"
+"S118ED-Y1-G5","U1B/9","3","10:00 - 11:00","1","Sadik","SP312"
+"S118ED-Y1-G5","U2/4","2","9:00 - 10:00","1","Amran","SP311"
+"S118ED-Y1-G5","TUT","2","11:00 - 12:00","1","Dalia","SP310"
+"S118ED-Y1-G5","U1P/4","2","2:15 - 3:15","1","Saimah","SP309"
+"S118ED-Y1-G5","U1C/14","2","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G5","U1P/4","3","11:15 - 12:15","1","Saimah","SP312"
+"S118ED-Y1-G5","U2/4","3","1:00 - 2:00","1","Amran","SP310"
+"S118ED-Y1-G5","U1B/9","4","11:00 - 12:00","1","Sadik","SP311"
+"S118ED-Y1-G5","U1C/14","4","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G5","U2C/3","5","10:00 - 11:00","1","Mubasshira","SP308"
+"S118ED-Y1-G5","U2P/4","5","11:00 - 12:00","1","Batoul","SP307"
+"S118ED-Y1-G5","U1/4","5","2:00 - 3:00","1","Dalia","SP310"
+"S118ED-Y1-G2","U2/4","1","9:00 - 10:30","1.5","Dalia","SP307"
+"S118ED-Y1-G2","U3B/10","1","11:00 - 12:30","1.5","Mubasshira","SP308"
+"S118ED-Y1-G2","U3P/4","1","1:45 - 3:15","1.5","Sam","SP310"
+"S118ED-Y1-G2","U1B/9","3","10:00 - 11:00","1","Sadik","SP312"
+"S118ED-Y1-G2","U2/4","2","9:00 - 10:00","1","Amran","SP311"
+"S118ED-Y1-G2","TUT","2","11:00 - 12:00","1","Dalia","SP310"
+"S118ED-Y1-G2","U1P/4","2","2:15 - 3:15","1","Saimah","SP309"
+"S118ED-Y1-G2","U1C/14","2","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G2","U1P/4","3","11:15 - 12:15","1","Saimah","SP312"
+"S118ED-Y1-G2","U2/4","3","1:00 - 2:00","1","Amran","SP310"
+"S118ED-Y1-G2","U1B/9","4","11:00 - 12:00","1","Sadik","SP311"
+"S118ED-Y1-G2","U1C/14","4","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G2","U2C/3","5","10:00 - 11:00","1","Mubasshira","SP308"
+"S118ED-Y1-G2","U2P/4","5","11:00 - 12:00","1","Batoul","SP307"
+"S118ED-Y1-G2","U1/4","5","2:00 - 3:00","1","Dalia","SP310"
+"S118ED-Y1-G4","U2/4","1","9:00 - 10:30","1.5","Dalia","SP307"
+"S118ED-Y1-G4","U3B/10","1","11:00 - 12:30","1.5","Mubasshira","SP308"
+"S118ED-Y1-G4","U3P/4","1","1:45 - 3:15","1.5","Sam","SP310"
+"S118ED-Y1-G4","U1B/9","3","10:00 - 11:00","1","Sadik","SP312"
+"S118ED-Y1-G4","U2/4","2","9:00 - 10:00","1","Amran","SP311"
+"S118ED-Y1-G4","TUT","2","11:00 - 12:00","1","Dalia","SP310"
+"S118ED-Y1-G4","U1P/4","2","2:15 - 3:15","1","Saimah","SP309"
+"S118ED-Y1-G4","U1C/14","2","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G4","U1P/4","3","11:15 - 12:15","1","Saimah","SP312"
+"S118ED-Y1-G4","U2/4","3","1:00 - 2:00","1","Amran","SP310"
+"S118ED-Y1-G4","U1B/9","4","11:00 - 12:00","1","Sadik","SP311"
+"S118ED-Y1-G4","U1C/14","4","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G4","U2C/3","5","10:00 - 11:00","1","Mubasshira","SP308"
+"S118ED-Y1-G4","U2P/4","5","11:00 - 12:00","1","Batoul","SP307"
+"S118ED-Y1-G4","U1/4","5","2:00 - 3:00","1","Dalia","SP310"
+"S118ED-Y1-G3","U2/4","1","9:00 - 10:30","1.5","Dalia","SP307"
+"S118ED-Y1-G3","U3B/10","1","11:00 - 12:30","1.5","Mubasshira","SP308"
+"S118ED-Y1-G3","U3P/4","1","1:45 - 3:15","1.5","Sam","SP310"
+"S118ED-Y1-G3","U1B/9","3","10:00 - 11:00","1","Sadik","SP312"
+"S118ED-Y1-G3","U2/4","2","9:00 - 10:00","1","Amran","SP311"
+"S118ED-Y1-G3","TUT","2","11:00 - 12:00","1","Dalia","SP310"
+"S118ED-Y1-G3","U1P/4","2","2:15 - 3:15","1","Saimah","SP309"
+"S118ED-Y1-G3","U1C/14","2","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G3","U1P/4","3","11:15 - 12:15","1","Saimah","SP312"
+"S118ED-Y1-G3","U2/4","3","1:00 - 2:00","1","Amran","SP310"
+"S118ED-Y1-G3","U1B/9","4","11:00 - 12:00","1","Sadik","SP311"
+"S118ED-Y1-G3","U1C/14","4","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G3","U2C/3","5","10:00 - 11:00","1","Mubasshira","SP308"
+"S118ED-Y1-G3","U2P/4","5","11:00 - 12:00","1","Batoul","SP307"
+"S118ED-Y1-G3","U1/4","5","2:00 - 3:00","1","Dalia","SP310"
+"S118ED-Y1-G6","U2/4","1","9:00 - 10:30","1.5","Dalia","SP307"
+"S118ED-Y1-G6","U3B/10","1","11:00 - 12:30","1.5","Mubasshira","SP308"
+"S118ED-Y1-G6","U3P/4","1","1:45 - 3:15","1.5","Sam","SP310"
+"S118ED-Y1-G6","U1B/9","3","10:00 - 11:00","1","Sadik","SP312"
+"S118ED-Y1-G6","U2/4","2","9:00 - 10:00","1","Amran","SP311"
+"S118ED-Y1-G6","TUT","2","11:00 - 12:00","1","Dalia","SP310"
+"S118ED-Y1-G6","U1P/4","2","2:15 - 3:15","1","Saimah","SP309"
+"S118ED-Y1-G6","U1C/14","2","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G6","U1P/4","3","11:15 - 12:15","1","Saimah","SP312"
+"S118ED-Y1-G6","U2/4","3","1:00 - 2:00","1","Amran","SP310"
+"S118ED-Y1-G6","U1B/9","4","11:00 - 12:00","1","Sadik","SP311"
+"S118ED-Y1-G6","U1C/14","4","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y1-G6","U2C/3","5","10:00 - 11:00","1","Mubasshira","SP308"
+"S118ED-Y1-G6","U2P/4","5","11:00 - 12:00","1","Batoul","SP307"
+"S118ED-Y1-G6","U1/4","5","2:00 - 3:00","1","Dalia","SP310"
+"S118ED-Y2-G1","U1","1","9:00 - 10:30","1.5","Batoul","SP312"
+"S118ED-Y2-G1","U1","3","1:00 - 2:30","1.5","Batoul","SP312"
+"S118ED-Y2-G1","U1","4","10:00 - 11:00","1","Batoul","SP312"
+"S118ED-Y2-G1","U2","1","10:45 - 12:15","1.5","Sadik","SP311"
+"S118ED-Y2-G1","U2","2","11:00 - 12:00","1","Sadik","SP311"
+"S118ED-Y2-G1","U2","4","11:00 - 12:00","1","Sadik","SP311"
+"S118ED-Y2-G1","U3","1","2:00 - 3:00","1","Alex","SP309"
+"S118ED-Y2-G1","U3","3","9:00 - 10:00","1","Alex","SP309"
+"S118ED-Y2-G1","U3","4","1:00 - 2:00","1","Alex","SP309"
+"S118ED-Y2-G1","U4","2","1:00 - 2:00","1","Saimah","SP309"
+"S118ED-Y2-G1","U4","3","11:15 - 12:15","1","Saimah","SP309"
+"S118ED-Y2-G1","U4","5","10:00 - 11:00","1","Saimah","SP309"
+"S118ED-Y2-G1","U5","3","2:15 - 3:15","1","Mubasshira","SP308"
+"S118ED-Y2-G1","U5","5","11:00 - 12:00","1","Mubasshira","SP308"
+"S118ED-Y2-G1","U6","2","9:00 - 10:00","1","Amran","SP310"
+"S118ED-Y2-G1","U6","4","9:00 - 10:00","1","Amran","SP310"
+"S118ED-Y2-G1","U6","5","2:00 - 3:00","1","Amran","SP310"
+`;
+            processTimetableCSV(timetableCSVContent);
+
+            function showMessage(text, isError = true) {
+                messageDisplay.textContent = text;
+                messageDisplay.classList.remove('hidden', 'text-green-600', 'text-red-600');
+                messageDisplay.classList.add(isError ? 'text-red-600' : 'text-green-600');
+            }
+
+            function resetDisplay() {
+                timetableDisplay.classList.add('hidden');
+                downloadBtn.disabled = true;
+                //downloadAttendanceBtn.disabled = true;
+                courseTitleElement.textContent = '';
+                messageDisplay.classList.add('hidden');
+                currentCourse = null;
+            }
+
+            function handleLookup() {
+                const studentId = studentIdInput.value.trim();
+                resetDisplay();
+
+                if (!studentId) {
+                    showMessage("Please enter a Student ID.", true);
+                    return;
+                }
+                
+                // Lookup course based on student ID
+                const course = idToCourseMap[studentId];
+
+                if (course) {
+                    // Check if timetable data exists for this course
+                    const hasEvents = timetableData.some(event => event.course === course);
+                    if (hasEvents) {
+                        drawTimetable(course);
+                        showMessage(`Timetable found for Course: ${course}`, false);
+                    } else {
+                        showMessage(`Course ${course} found for ID, but no timetable data is available.`, true);
+                    }
+                } else {
+                    showMessage(`Student ID ${studentId} not found. Please check the ID.`, true);
+                }
+            }
+            
+            // Event listener for the "Show Timetable" button
+            lookupBtn.addEventListener('click', handleLookup);
+
+            // Allow lookup on Enter key press in the input field
+            studentIdInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    handleLookup();
+                }
+            });
+
+
+            // Event listener for the download Timetable PDF button (Original logic)
+            downloadBtn.addEventListener('click', () => {
+                if (currentCourse) {
+                    const doc = new window.jspdf.jsPDF('l', 'mm', 'a4'); // 'l' for landscape mode
+                    const canvasImage = canvas.toDataURL('image/png', 1.0);
+                    
+                    const imgWidth = 297; 
+                    const pageHeight = 210; 
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    let heightLeft = imgHeight;
+
+                    let position = 0;
+
+                    doc.addImage(canvasImage, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+
+                    while (heightLeft >= 0) {
+                        position = heightLeft - imgHeight;
+                        doc.addPage();
+                        doc.addImage(canvasImage, 'PNG', 0, position, imgWidth, imgHeight);
+                        heightLeft -= pageHeight;
+                    }
+                    
+                    const filename = `timetable-${currentCourse}.pdf`;
+                    doc.save(filename);
+                }
+            });
+
+            // Event listener for the download Attendance Card button (New visual logic)
+            /*downloadAttendanceBtn.addEventListener('click', () => {
+                if (currentCourse) {
+                    generateAttendanceCardPDF(currentCourse);
+                }
+            });*/
+            
+            // Initialize with the input focused
+            studentIdInput.focus();
+        });
+    </script>
+</body>
+</html>
