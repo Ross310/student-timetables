@@ -174,7 +174,8 @@
                 dataRows.forEach(rowString => {
                     // Split the row by comma. This is simple and reliable for getting the first and last column,
                     // even if quoted fields with internal commas break the middle columns.
-                    const cells = rowString.split(' '); 
+                    // split on tab was ,
+                    const cells = rowString.split('\t'); 
                     
                     if (cells.length > 1) {
                         // Extract the first cell (ID) and the last cell (Course)
@@ -549,6 +550,7 @@
     </script>
 </body>
 </html>
+
 
 
 
