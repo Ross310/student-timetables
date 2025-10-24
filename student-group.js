@@ -108,7 +108,7 @@ export const idMapCSVContent = `id,name,course
 20369989,"Bhatti, Mr Mubarak Asad Ali",S118ED-Y1-G6
 `;
 
-const timetableCSVContent = `"course","unit","day","time","length","lecturer","room"
+export const timetableCSVContent = `"course","unit","day","time","length","lecturer","room"
 "S104-G1","U4","2","9:00 - 10:30","1.5","Batoul","SP215"
 "S104-G1","TUT","2","11:00 - 12:00","1","Batoul","SP109"
 "S104-G1","U19","2","1:00 - 2:30","1.5","Batoul","SP312"
@@ -225,4 +225,5 @@ const timetableCSVContent = `"course","unit","day","time","length","lecturer","r
 "S118ED-Y2-G1","U6","2","9:00 - 10:00","1","Amran","SP310"
 "S118ED-Y2-G1","U6","4","9:00 - 10:00","1","Amran","SP310"
 "S118ED-Y2-G1","U6","5","2:00 - 3:00","1","Amran","SP310"
+
 `;
