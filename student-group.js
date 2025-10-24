@@ -1,7 +1,7 @@
 
 // CSV Content for Student ID to Course Group mapping (Groups for TT yr1.csv)
 export const idMapCSVContent = `id,course
-20368757	S118ED-Y1-G1
+20368757	S118ED-Y1-G5
 20378618	S118ED-Y1-G1
 20377797	S118ED-Y1-G1
 20381185	S118ED-Y1-G1
@@ -298,4 +298,5 @@ export const timetableCSVContent = `"course","unit","day","time","length","lectu
 "S118ED-Y1-G6","U2/4","4","9:00 - 10:00","1","Amran","SP312"
 "S118ED-Y1-G6","U2/4","4","1:00 - 2:30","1.5","Dalia","SP307"
 `;
+
 
