@@ -125,9 +125,9 @@
             const timeHeaderWidth = 80;
             const dayHeaderHeight = 40;
             const timeSlots = [
-                '9:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'
+                '9:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00', '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00', '15:00 - 16:00', '16:00 - 17:00'
             ];
-            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+            const days = ['Mon', 'Tues', 'Wed', 'Thurs', 'Fri'];
             const minutesInSlot = 30;
 
             // Helper function: parse time string like "9:00" and return minutes from midnight
@@ -220,7 +220,7 @@
                 
                 // Draw day labels
                 ctx.fillStyle = '#4b5563';
-                ctx.font = '600 14px Inter, sans-serif';
+                ctx.font = '600 18px Inter, sans-serif';
                 ctx.textAlign = 'left';
                 days.forEach((day, index) => {
                     ctx.save();
@@ -272,7 +272,13 @@
                         const height = dayCellHeight;
 
                         // Draw event rectangle
-                        ctx.fillStyle = '#1e40af'; // Darker blue fill
+                        if (eng_maths.includes(event.unit))
+                        {
+                             ctx.fillStyle = '#45913d'; // Darker green fill
+                        }else{
+                             ctx.fillStyle = '#1e40af'; // Darker blue fill
+                        }
+                       
                         ctx.strokeStyle = '#2563eb';
                         ctx.lineWidth = 1;
                         ctx.beginPath();
@@ -550,6 +556,7 @@
     </script>
 </body>
 </html>
+
 
 
 
