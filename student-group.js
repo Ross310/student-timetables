@@ -166,7 +166,7 @@ export const idMapCSVContent = `id,course
 export const timetableCSVContent = `"course","unit","day","time","length","lecturer","room"
 "S104-G1","U4","2","9:00 - 10:30","1.5","Batoul","SP215"
 "S104-G1","TUT","2","11:00 - 12:00","1","Batoul","SP309"
-"S104-G1","U19","2","1:00 - 2:30","1.5","Batoul","SP005"
+"S104-G1","U19","2","1:00 - 2:30","1.5","Batoul","SP311"
 "S104-G1","U12","4","1:15 - 2:45","1.5","Batoul","SP311"
 "S104-G1","English","3","9:00 - 10:30","1.5","None","TBA"
 "S104-G1","Maths","3","10:45 - 12:15","1.5","None","TBA"
@@ -298,6 +298,7 @@ export const timetableCSVContent = `"course","unit","day","time","length","lectu
 "S118ED-Y1-G6","U2/4","4","9:00 - 10:00","1","Amran","SP312"
 "S118ED-Y1-G6","U2/4","4","1:00 - 2:30","1.5","Dalia","SP307"
 `;
+
 
 
 
