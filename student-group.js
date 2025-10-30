@@ -260,7 +260,7 @@ export const timetableCSVContent = `"course","unit","day","time","length","lectu
 "S118ED-Y1-G4","U2/4","1","1:15 - 2:15","1","Amran","SP301"
 "S118ED-Y1-G4","U1C/14","5","11:00 - 12:00","1","John","SP306"
 "S118ED-Y1-G4","U1C/14","5","2:30 - 3:30","1","Alex","SP308"
-"S118ED-Y1-G4","U1P/4","3","9:00 - 10:00","1","Saimah","SP310"
+"S118ED-Y1-G4","U1P/4","3","9:00 - 10:00","1","Saimah","SP208"
 "S118ED-Y1-G4","Maths","1","9:00 - 10:45","1.75","TBA","TBA"
 "S118ED-Y1-G4","Maths","3","11:00 - 12:30","1.5","TBA","TBA"
 "S118ED-Y2-G4","U5B/20","2","9:00 - 10:45","1.75","Maarya","SP301"
@@ -298,6 +298,7 @@ export const timetableCSVContent = `"course","unit","day","time","length","lectu
 "S118ED-Y1-G6","U2/4","4","9:00 - 10:00","1","Amran","SP312"
 "S118ED-Y1-G6","U2/4","4","1:00 - 2:30","1.5","Dalia","SP307"
 `;
+
 
 
 
