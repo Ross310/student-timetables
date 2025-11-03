@@ -181,9 +181,9 @@ export const timetableCSVContent = `"course","unit","day","time","length","lectu
 "S118ED-Y1-G1","TUT","3","11:00 - 12:00","1","Saimah","SP312"
 "S118ED-Y1-G1","U3P/4","2","9:00 - 10:30","1.5","Sam","SP310"
 "S118ED-Y1-G1","U3B/10","4","9:00 - 10:30","1.5","Mubasshira","SP308"
-"S118ED-Y1-G1","English","5","9:00 - 10:30","1.5","None","TBA"
+"S118ED-Y1-G1","English","5","9:00 - 10:30","1.5","Paula","SP208"
 "S118ED-Y1-G1","U2/4","3","1:00 - 2:30","1.5","Dalia","SP307"
-"S118ED-Y1-G1","English","2","11:00 - 12:30","1.5","None","TBA"
+"S118ED-Y1-G1","English","2","11:00 - 12:30","1.5","Paula","SP208"
 "S118ED-Y1-G1","U1C/14","5","1:15 - 2:15","1","Alex","SP307"
 "S118ED-Y1-G1","U1P/4","4","2:30 - 3:30","1","Saimah","SP312"
 "S118ED-Y1-G1","U1C/14","4","11:00 - 12:00","1","John","SP306"
@@ -261,8 +261,8 @@ export const timetableCSVContent = `"course","unit","day","time","length","lectu
 "S118ED-Y1-G4","U1C/14","5","11:00 - 12:00","1","John","SP306"
 "S118ED-Y1-G4","U1C/14","5","2:30 - 3:30","1","Alex","SP308"
 "S118ED-Y1-G4","U1P/4","3","9:00 - 10:00","1","Saimah","SP208"
-"S118ED-Y1-G4","Maths","1","9:00 - 10:45","1.75","TBA","TBA"
-"S118ED-Y1-G4","Maths","3","11:00 - 12:30","1.5","TBA","TBA"
+"S118ED-Y1-G4","Maths","1","9:00 - 10:45","1.75","khadija","SP201"
+"S118ED-Y1-G4","Maths","3","11:00 - 12:30","1.5","Khadija","SP201"
 "S118ED-Y2-G4","U5B/20","2","9:00 - 10:45","1.75","Maarya","SP301"
 "S118ED-Y2-G4","U5P/21","5","1:15 - 2:15","1","Maarya","SP301"
 "S118ED-Y2-G4","U5P/21","3","9:00 - 10:45","1.75","Steven","SP309"
@@ -298,6 +298,7 @@ export const timetableCSVContent = `"course","unit","day","time","length","lectu
 "S118ED-Y1-G6","U2/4","4","9:00 - 10:00","1","Amran","SP312"
 "S118ED-Y1-G6","U2/4","4","1:00 - 2:30","1.5","Dalia","SP307"
 `;
+
 
 
 
