@@ -32,7 +32,7 @@ export const idMapCSVContent = `id,course
 20384638	S118ED-Y1-G4
 20380340	S118ED-Y1-G2
 20379456	S118ED-Y1-G2
-20378753	S118ED-Y1-G2
+20378753	S118ED-Y1-G4
 20378464	S118ED-Y1-G2
 20378430	S118ED-Y1-G2
 20380322	S118ED-Y1-G3
@@ -298,6 +298,7 @@ export const timetableCSVContent = `"course","unit","day","time","length","lectu
 "S118ED-Y1-G6","U2/4","4","9:00 - 10:00","1","Amran","SP312"
 "S118ED-Y1-G6","U2/4","4","1:00 - 2:30","1.5","Dalia","SP307"
 `;
+
 
 
 
