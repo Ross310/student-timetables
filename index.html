@@ -151,7 +151,7 @@
 
             // Function to process the main timetable CSV content
             function processTimetableCSV(csvString) {
-                const rows = csvString.trim().split('\n').map(row => row.split(',').map(cell => cell.replace(/"/g, '')));
+                const rows = csvString.trim().split('\n').map(row => row.split('\t').map(cell => cell.replace(/"/g, '')));
                 const headers = rows[0];
                 timetableData = rows.slice(1).map(row => {
                     const event = {};
@@ -557,6 +557,7 @@
     </script>
 </body>
 </html>
+
 
 
 
