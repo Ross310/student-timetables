@@ -163,7 +163,7 @@ export const idMapCSVContent = `id  course
 20358677	S118ED-Y2-G4
 `;
 
-export const timetableCSVContent = `course  unit  day  time  length  lecturer  room
+export const timetableCSVContent = `course	unit	day	time	length	lecturer	room
 S104-G1	U4	2	9:00 - 10:30	1.5	Batoul	SP215
 S104-G1	TUT	2	11:00 - 12:00	1	Batoul	SP309
 S104-G1	U19	2	1:00 - 2:30	1.5	Batoul	SP311
@@ -297,8 +297,8 @@ S118ED-Y1-G6	U3C/14	3	1:00 - 2:30	1.5	Alex	SP309
 S118ED-Y1-G6	U3B/10	4	10:30 - 12:00	1.5	Batoul	SP214
 S118ED-Y1-G6	U2/4	4	9:00 - 10:00	1	Amran	SP312
 S118ED-Y1-G6	U2/4	4	1:00 - 2:30	1.5	Dalia	SP307
-
 `;
+
 
 
 
